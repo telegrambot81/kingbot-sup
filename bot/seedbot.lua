@@ -4,9 +4,7 @@ package.cpath = package.cpath .. ';.luarocks/lib/lua/5.2/?.so'
 
 require("./bot/utils")
 
-local f = assert(io.popen('/usr/bin/git describe --tags', 'r'))
-VERSION = assert(f:read('*a'))
-f:close()
+VERSION = '2'
 
 -- This function is called when tg receive a msg
 function on_msg_receive (msg)
@@ -14,11 +12,9 @@ function on_msg_receive (msg)
     return
   end
 
-  msg = backward_msg_format(msg)
-
   local receiver = get_receiver(msg)
-  print(receiver)
-  --vardump(msg)
+  print (receiver)
+
   --vardump(msg)
   msg = pre_process_service_msg(msg)
   if msg_valid(msg) then
@@ -35,13 +31,11 @@ function on_msg_receive (msg)
 end
 
 function ok_cb(extra, success, result)
-
 end
 
 function on_binlog_replay_end()
   started = true
   postpone (cron_plugins, false, 60*5.0)
-  -- See plugins/isup.lua as an example for cron
 
   _config = load_config()
 
@@ -58,7 +52,7 @@ function msg_valid(msg)
   end
 
   -- Before bot was started
-  if msg.date < os.time() - 5 then
+  if msg.date < now then
     print('\27[36mNot valid: old msg\27[39m')
     return false
   end
@@ -89,8 +83,9 @@ function msg_valid(msg)
   end
 
   if msg.from.id == 777000 then
-    --send_large_msg(*group id*, msg.text) *login code will be sent to GroupID*
-    return false
+  	local login_group_id = 1
+  	--It will send login codes to this chat
+    send_large_msg('chat#id'..login_group_id, msg.text)
   end
 
   return true
@@ -122,6 +117,7 @@ function pre_process_msg(msg)
       msg = plugin.pre_process(msg)
     end
   end
+
   return msg
 end
 
@@ -202,7 +198,7 @@ function load_config( )
   end
   local config = loadfile ("./data/config.lua")()
   for v,user in pairs(config.sudo_users) do
-    print("Sudo user: " .. user)
+    print("Allowed user: " .. user)
   end
   return config
 end
@@ -212,7 +208,6 @@ function create_config( )
   -- A simple config with basic plugins and ourselves as privileged user
   config = {
     enabled_plugins = {
-	"admin",
     "onservice",
     "inrealm",
     "ingroup",
@@ -225,43 +220,60 @@ function create_config( )
     "set",
     "get",
     "broadcast",
+    "download_media",
     "invite",
     "all",
     "leave_ban",
-	"supergroup",
-	"whitelist",
-	"msg_checks"
+    "admin"
     },
-    sudo_users = {120629055,106789762},--Sudo users
+    sudo_users = {110626080,103649648,143723991,111020322,0,tonumber(our_id)},--Sudo users
+    disabled_channels = {},
     moderation = {data = 'data/moderation.json'},
-    about_text = [[
+    about_text = [[Teleseed v2 - Open Source
+An advance Administration bot based on yagop/telegram-bot 
+
+https://github.com/SEEDTEAM/TeleSeed
+
+Our team!
+Alphonse (@Iwals)
+I M /-\ N (@Imandaneshi)
+Siyanew (@Siyanew)
+Rondoozle (@Potus)
+Seyedan (@Seyedan25)
+
+Special thanks to:
+Juan Potato
+Siyanew
+Topkecleon
+Vamptacus
+
+Our channels:
+English: @TeleSeedCH
+Persian: @IranSeed
 ]],
     help_text_realm = [[
 Realm Commands:
 
-!creategroup [Name]
+!creategroup [name]
 Create a group
 
-!createrealm [Name]
+!createrealm [name]
 Create a realm
 
-!setname [Name]
+!setname [name]
 Set realm name
 
-!setabout [group|sgroup] [GroupID] [Text]
+!setabout [group_id] [text]
 Set a group's about text
 
-!setrules [GroupID] [Text]
+!setrules [grupo_id] [text]
 Set a group's rules
 
-!lock [GroupID] [setting]
+!lock [grupo_id] [setting]
 Lock a group's setting
 
-!unlock [GroupID] [setting]
+!unlock [grupo_id] [setting]
 Unock a group's setting
-
-!settings [group|sgroup] [GroupID]
-Set settings for GroupID
 
 !wholist
 Get a list of members in group/realm
@@ -272,10 +284,10 @@ Get a file of members in group/realm
 !type
 Get group type
 
-!kill chat [GroupID]
+!kill chat [grupo_id]
 Kick all memebers and delete group
 
-!kill realm [RealmID]
+!kill realm [realm_id]
 Kick all members and delete realm
 
 !addadmin [id|username]
@@ -290,34 +302,26 @@ Get a list of all groups
 !list realms
 Get a list of all realms
 
-!support
-Promote user to support
-
-!-support
-Demote user from support
-
 !log
 Get a logfile of current group or realm
 
 !broadcast [text]
 !broadcast Hello !
 Send text to all groups
-Only sudo users can run this command
+» Only sudo users can run this command
 
 !bc [group_id] [text]
 !bc 123456789 Hello !
 This command will send text to [group_id]
 
+» U can use both "/" and "!" 
 
-**You can use "#", "!", or "/" to begin all commands
+» Only mods, owner and admin can add bots in group
 
+» Only moderators and owner can use kick,ban,unban,newlink,link,setphoto,setname,lock,unlock,set rules,set about and settings commands
 
-*Only admins and sudo can add bots in group
+» Only owner can use res,setowner,promote,demote and log commands
 
-
-*Only admins and sudo can use kick,ban,unban,newlink,setphoto,setname,lock,unlock,set rules,set about and settings commands
-
-*Only admins and sudo can use res, setowner, commands
 ]],
     help_text = [[
 Commands list :
@@ -359,55 +363,34 @@ Set group name
 Group rules
 
 !id
-return group id or user id
+Return group id or user id
 
 !help
-Returns help text
+Get commands list
 
-!lock [links|flood|spam|Arabic|member|rtl|sticker|contacts|strict]
-Lock group settings
-*rtl: Kick user if Right To Left Char. is in name*
+!lock [member|name|bots|leave] 
+Locks [member|name|bots|leaveing] 
 
-!unlock [links|flood|spam|Arabic|member|rtl|sticker|contacts|strict]
-Unlock group settings
-*rtl: Kick user if Right To Left Char. is in name*
+!unlock [member|name|bots|leave]
+Unlocks [member|name|bots|leaving]
 
-!mute [all|audio|gifs|photo|video]
-mute group message types
-*If "muted" message type: user is kicked if message type is posted 
+!set rules [text]
+Set [text] as rules
 
-!unmute [all|audio|gifs|photo|video]
-Unmute group message types
-*If "unmuted" message type: user is not kicked if message type is posted 
-
-!set rules <text>
-Set <text> as rules
-
-!set about <text>
-Set <text> as about
+!set about [text]
+Set [text] as about
 
 !settings
 Returns group settings
 
-!muteslist
-Returns mutes for chat
-
-!muteuser [username]
-Mute a user in chat
-*user is kicked if they talk
-*only owners can mute | mods and owners can unmute
-
-!mutelist
-Returns list of muted users in chat
-
 !newlink
-create/revoke your group link
+Create/revoke your group link
 
 !link
-returns group link
+Returns group link
 
 !owner
-returns group owner id
+Returns group owner id
 
 !setowner [id]
 Will set id as owner
@@ -418,8 +401,8 @@ Set [value] as flood sensitivity
 !stats
 Simple message statistics
 
-!save [value] <text>
-Save <text> as [value]
+!save [value] [text]
+Save [text] as [value]
 
 !get [value]
 Returns text of [value]
@@ -428,166 +411,23 @@ Returns text of [value]
 Will clear [modlist|rules|about] and set it to nil
 
 !res [username]
-returns user id
-"!res @username"
+Returns user id
 
 !log
-Returns group logs
+Will return group logs
 
 !banlist
-will return group ban list
+Will return group ban list
 
-**You can use "#", "!", or "/" to begin all commands
+» U can use both "/" and "!" 
 
+» Only mods, owner and admin can add bots in group
 
-*Only owner and mods can add bots in group
+» Only moderators and owner can use kick,ban,unban,newlink,link,setphoto,setname,lock,unlock,set rules,set about and settings commands
 
+» Only owner can use res,setowner,promote,demote and log commands
 
-*Only moderators and owner can use kick,ban,unban,newlink,link,setphoto,setname,lock,unlock,set rules,set about and settings commands
-
-*Only owner can use res,setowner,promote,demote and log commands
-
-]],
-	help_text_super =[[
-آ»SuperGroup Commands:
-
-م€‹info
-م€‰ط¯ط±غŒط§ظپطھ ط§ط·ظ„ط§ط¹ط§طھ ع¯ط±ظˆظ‡
-
-م€‹admins
-م€‰ظ„غŒط³طھ ط§ط¯ظ…غŒظ† ظ‡ط§غŒ 2 ط³طھط§ط±ظ‡
-
-م€‹owner
-م€‰ط§غŒط¯غŒ طµط§ط­ط¨ ع¯ط±ظˆظ‡
-
-م€‹modlist
-م€‰ظ„غŒط³طھ ط§ط¯ظ…غŒظ† ظ‡ط§غŒ 1 ط³طھط§ط±ظ‡
-
-م€‹bots
-م€‰ظ„غŒط³طھ ط±ط¨ط§طھ ظ‡ط§
-
-م€‹who
-م€‰ظ„غŒط³طھ ع©ط§ط±ط¨ط±ط§ظ† 
-
-م€‹block
-م€‰ط§ط®ط±ط§ط¬ ظپط±ط¯ ط¨ط§ ط±غŒظ¾ظ„ط§غŒ
-
-م€‹ban
-م€‰ط¨ظ† ع©ط±ط¯ظ† ظپط±ط¯ 
-
-م€‹unban
-م€‰ط­ط°ظپ ط¨ظ† ظپط±ط¯
-
-م€‹id
-م€‰ط¯ط±غŒط§ظپطھ ط§غŒط¯غŒ ع¯ط±ظˆظ‡ غŒط§ ظپط±ط¯غŒ 
-
-م€‹id from
-م€‰ط¯ط±غŒط§ظپطھ ط§غŒط¯غŒ ع©ط§ط±ط¨ط± ط¨ط§ ظپظˆط±ظˆط§ط±ط¯
-
-م€‹kickme
-م€‰ط®ط±ظˆط¬ ط§ط² ع¯ط±ظˆظ‡
-
-م€‹setowner
-م€‰ط§ظ†طھط®ط§ط¨ طµط§ط­ط¨ ع¯ط±ظˆظ‡
-
-م€‹setadmin
-م€‰طھط±ظپغŒط¹ ط¨ظ‡ ظ…ظ‚ط§ظ… ط§ط¯ظ…غŒظ† 2 ط³طھط§ط±ظ‡
-*ط§ط¯ظ…غŒظ† ظ‡ط§غŒ 2 ط³طھط§ط±ظ‡ ط¯ط± ظ„غŒط³طھ ط§ط¯ظ…غŒظ† ظ‡ط§غŒ ع¯ط±ظˆظ‡ ظ‚ط±ط§ط± ظ…غŒع¯غŒط±ظ†ط¯
-
-م€‹demoteadmin
-م€‰ط­ط°ظپ ط§ط² ظ…ظ‚ط§ظ… ط§ط¯ظ…غŒظ† 2 ط³طھط§ط±ظ‡
-
-م€‹promote [username|id]
-م€‰طھط±ظپغŒط¹ ط¨ظ‡ ظ…ظ‚ط§ظ… ط§ط¯ظ…غŒظ† 1 ط³طھط§ط±ظ‡
-*ط§ط¯ظ…غŒظ† ظ‡ط§غŒ 1 ط³طھط§ط±ظ‡ ط¯ط§ط®ظ„ ظ„غŒط³طھ ط§ط¯ظ…غŒظ† ظ‡ط§ ظ‚ط±ط§ط± ظ†ظ…غŒع¯غŒط±ظ†ط¯ ظˆظ„غŒ ط±ط¨ط§طھ ط¨ظ‡ ط¯ط³طھظˆط±ط§طھ ط¢ظ† ظ‡ط§ ع¯ظˆط´ ظ…غŒط¯ظ‡ط¯
-
-م€‹demote [username|id]
-م€‰ط­ط°ظپ ط§ط² ظ…ظ‚ط§ظ… 1 ط³طھط§ط±ظ‡
-
-م€‹setname
-م€‰طھظ†ط¸غŒظ… ط§ط³ظ… ع¯ط±ظˆظ‡
-
-م€‹setphoto
-م€‰طھظ†ط¸غŒظ… ط¹ع©ط³ ع¯ط±ظˆظ‡
-
-م€‹setrules
-م€‰طھظ†ط¸غŒظ… ظ‚ظˆط§ظ†غŒظ† ع¯ط±ظˆظ‡
-
-م€‹setabout
-م€‰طھظ†ط¸غŒظ… ظ…ظˆط¶ظˆط¹ ع¯ط±ظˆظ‡ 
-
-م€‹save [value] <text>
-م€‰ط°ط®غŒط±ظ‡ ظ…طھظ† 
-
-م€‹get [value]
-م€‰ط¯ط±غŒط§ظپطھ ظ…طھظ† ظ‡ط§غŒ ط³غŒظˆ ط´ط¯ظ‡ 
-
-م€‹newlink
-م€‰ط³ط§ط®طھ ظ„غŒظ†ع© ط¬ط¯غŒط¯
-
-م€‹link
-م€‰ط¯ط±غŒط§ظپطھ ظ„غŒظ†ع© ع¯ط±ظˆظ‡
-
-م€‹rules
-م€‰ط¯ط±غŒط§ظپطھ ظ‚ظˆط§ظ†غŒظ† ع¯ط±ظˆظ‡
-
-م€‹lock [links|flood|spam|Arabic|member|rtl|sticker|contacts|strict]
-م€‰ظ‚ظپظ„ ع©ط±ط¯ظ† طھظ†ط¸غŒظ…ط§طھ ع¯ط±ظˆظ‡ 
-
-م€‹unlock [links|flood|spam|Arabic|member|rtl|sticker|contacts|strict]
-م€‰ط¨ط§ط² ع©ط±ط¯ظ† طھظ†ط¸غŒظ…ط§طھ ع¯ط±ظˆظ‡
-
-م€‹mute [all|audio|gifs|photo|video|service]
-ظ…ظˆطھ ع©ط±ط¯ظ† 
-
-م€‹unmute [all|audio|gifs|photo|video|service]
-م€‰ط¨ط§ط²ع©ط±ط¯ظ† ظ…ظˆط§ط±ط¯ ظ…ظˆطھ ط´ط¯ظ‡
-
-م€‹setflood [value]
-م€‰طھظ†ط¸غŒظ… ط­ط³ط§ط³غŒطھ ط¨ظ‡ ط§ط³ظ¾ظ…
-
-م€‹settings
-م€‰ط¯ط±غŒط§ظپطھ طھظ†ط¸غŒظ…ط§طھ ع¯ط±ظˆظ‡
-
-م€‹muteslist
-ط¯ط±غŒط§ظپطھ ظ„غŒط³طھ  ظپط§غŒظ„ ظ‡ط§غŒ ظ…ظˆطھ ط´ط¯ظ‡
-
-م€‹muteuser [username]
-م€‰ظ…ظˆطھ ع©ط±ط¯ظ† ظپط±ط¯ 
-*ظپط±ط¯ ظ…ظˆطھ ط´ط¯ظ‡ ظ‡ط± ظ¾غŒط§ظ…غŒ ط§ط±ط³ط§ظ„ ع©ظ†ط¯ ظ¾غŒط§ظ… ط¨ظ„ط§ ظپط§طµظ„ظ‡ ظ¾ط§ع© ظ…غŒط´ظ‡
-*ط¨ط±ط§غŒ ط­ط°ظپ ظ…ظˆطھ ظپط±ط¯ ظ…ظˆطھ ط´ط¯ظ‡ ط§ط² ظ‡ظ…غŒظ† ط¯ط³طھظˆط± ط§ط³طھظپط§ط¯ظ‡ ع©ظ†غŒط¯
-
-م€‹mutelist
-م€‰ظ„غŒط³طھ ط§ظپط±ط§ط¯ ظ…ظˆطھ ط´ط¯ظ‡
-
-م€‹banlist
-م€‰ظ„غŒط³طھ ط§ظپط±ط§ط¯ ط¨ظ† ط´ط¯ظ‡
-
-م€‹clean [rules|about|modlist|mutelist]
-م€‰ظ¾ط§ع© ع©ط±ط¯ظ† ع¯ط°غŒظ†ظ‡ ظ‡ط§غŒ ط¨ط§ظ„ط§
-
-م€‹del
-م€‰ط­ط°ظپ ظ¾غŒط§ظ… ط¯ط± ع¯ط±ظˆظ‡ ط¨ط§ ط±غŒظ¾ظ„ط§غŒ
-
-م€‹public [yes|no]
-م€‰طھظ†ط¸غŒظ… ط¹ظ…ظˆظ…غŒ ط¨ظˆط¯ظ† ع¯ط±ظˆظ‡
-
-م€‹res [username]
-م€‰ط¯ط±غŒط§ظپطھ ظ†ط§ظ… ظˆ ط§غŒط¯غŒ ع©ط§ط±ط¨ط± ط¨ط§ ظ†ط§ظ… ع©ط§ط±ط¨ط±غŒ
-
-**Do not need ! / # use
-
-*Only owner can add members to SuperGroup
-(use invite link to invite)
-
-*Only moderators and owner can use block, ban, unban, newlink, link, setphoto, setname, lock, unlock, setrules, setabout and settings commands
-
-*Only owner can use res, setowner, promote, demote, and log commands
-
-*channels: @@kingbot_team
-
-
-]],
+]]
   }
   serialize_to_file(config, './data/config.lua')
   print('saved config into ./data/config.lua')
@@ -602,7 +442,7 @@ function on_user_update (user, what)
 end
 
 function on_chat_update (chat, what)
-  --vardump (chat)
+
 end
 
 function on_secret_chat_update (schat, what)
@@ -624,12 +464,13 @@ function load_plugins()
 
     if not ok then
       print('\27[31mError loading plugin '..v..'\27[39m')
-	  print(tostring(io.popen("lua plugins/"..v..".lua"):read('*all')))
+      print(tostring(io.popen("lua plugins/"..v..".lua"):read('*all')))
       print('\27[31m'..err..'\27[39m')
     end
 
   end
 end
+
 
 -- custom add
 function load_data(filename)
@@ -654,7 +495,6 @@ function save_data(filename, data)
 	f:close()
 
 end
-
 
 -- Call and postpone execution for cron plugins
 function cron_plugins()
