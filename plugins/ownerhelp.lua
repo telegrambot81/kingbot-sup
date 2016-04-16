@@ -135,9 +135,8 @@ do
 
 **Do not need ! / # use
 
-*channels: @viper_ch & @creat_anti_spam
+*channels: @kingbot_team
 
-*sudo: @anonymous1221
 ]]
     return text
   end
